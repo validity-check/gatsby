@@ -85,25 +85,31 @@ Cypress.Commands.add(`assertRoute`, route => {
   cy.url().should(`equal`, `${window.location.origin}${route}`)
 })
 
-// react-error-overlay is iframe, so this is just convenience helper
-// https://www.cypress.io/blog/2020/02/12/working-with-iframes-in-cypress/#custom-command
-Cypress.Commands.add(`getOverlayIframe`, () => {
-  // get the iframe > document > body
-  // and retry until the body element is not empty
-  return (
-    cy
-      .get(`iframe`, { log: true, timeout: 150000 })
-      .its(`0.contentDocument.body`)
-      .should(`not.be.empty`)
-      // wraps "body" DOM element to allow
-      // chaining more Cypress commands, like ".find(...)"
-      // https://on.cypress.io/wrap
-      .then(cy.wrap, { log: true })
-  )
+// overwriting visit and creating a waitForHmr function to help us deal with HMR
+Cypress.Commands.overwrite("visit", (orig, url, options = {}) => {
+  const newOptions = {
+    ...options,
+    onBeforeLoad: win => {
+      if (options.onBeforeLoad) {
+        options.onBeforeLoad(win)
+      }
+
+      cy.spy(win.console, "log").as(`hmrConsoleLog`)
+    },
+  }
+
+  return orig(url, newOptions)
 })
 
-Cypress.Commands.add(`assertNoOverlayIframe`, () => {
-  // get the iframe > document > body
-  // and retry until the body element is not empty
-  return cy.get(`iframe`, { log: true, timeout: 15000 }).should(`not.exist`)
+Cypress.Commands.add(`waitForHmr`, (message = `App is up to date`) => {
+  cy.get(`@hmrConsoleLog`).should(`be.calledWithMatch`, message)
+  cy.wait(1000)
 })
+
+Cypress.Commands.add(`getFastRefreshOverlay`, () => (
+  cy.get('gatsby-fast-refresh').shadow()
+))
+
+Cypress.Commands.add(`assertNoFastRefreshOverlay`, () => (
+  cy.get('gatsby-fast-refresh').should('not.exist')
+))

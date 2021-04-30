@@ -10,7 +10,6 @@ benchmarks/**/public
 e2e-tests/**/public
 examples/**/public
 integration-tests/**/public
-www
 
 # cache-dirs
 **/.cache
@@ -24,6 +23,7 @@ packages/gatsby-plugin-mdx/node_modules/**/*.js
 packages/gatsby/cache-dir/commonjs/**/*.js
 packages/gatsby-admin/public/styles.*
 packages/gatsby/gatsby-admin-public/styles.*
+packages/gatsby-source-wordpress/test-site/**
 
 # fixtures
 **/__testfixtures__/**
@@ -31,6 +31,3 @@ packages/gatsby/gatsby-admin-public/styles.*
 
 # coverage
 coverage
-
-# forestry files
-.forestry/**/*

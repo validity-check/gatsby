@@ -4,76 +4,93 @@ import { GatsbyImageProps } from "./gatsby-image.browser"
 import { LayoutWrapper } from "./layout-wrapper"
 import { Placeholder } from "./placeholder"
 import { MainImageProps, MainImage } from "./main-image"
-import {
-  getMainProps,
-  getPlaceHolderProps,
-  hasNativeLazyLoadSupport,
-  hasImageLoaded,
-} from "./hooks"
+import { getMainProps, getPlaceholderProps } from "./hooks"
 import { ReactElement } from "react"
 
 type LazyHydrateProps = Omit<GatsbyImageProps, "as" | "style" | "className"> & {
-  width: number
-  height: number
   isLoading: boolean
   isLoaded: boolean // alwaystype SetStateAction<S> = S | ((prevState: S) => S);
-  toggleIsLoaded: Function
+  toggleIsLoaded: (toggle: boolean) => void
   ref: MutableRefObject<HTMLImageElement | undefined>
 }
 
 export function lazyHydrate(
   {
-    layout = `fixed`,
-    width,
-    height,
-    placeholder,
-    images,
+    image,
     loading,
     isLoading,
     isLoaded,
     toggleIsLoaded,
     ref,
+    imgClassName,
+    imgStyle = {},
+    objectPosition,
+    backgroundColor,
+    objectFit = `cover`,
     ...props
   }: LazyHydrateProps,
   root: MutableRefObject<HTMLElement | undefined>,
-  hydrated: MutableRefObject<boolean>
+  hydrated: MutableRefObject<boolean>,
+  forceHydrate: MutableRefObject<boolean>
 ): (() => void) | null {
-  if (!root.current) {
-    return null
-  }
-
-  const hasSSRHtml = root.current.querySelector(`[data-gatsby-image-ssr]`)
-  // On first server hydration do nothing
-  if (hasNativeLazyLoadSupport && hasSSRHtml && !hydrated.current) {
-    return null
-  }
+  const {
+    width,
+    height,
+    layout,
+    images,
+    placeholder,
+    backgroundColor: wrapperBackgroundColor,
+  } = image
 
   const cacheKey = JSON.stringify(images)
-  const hasLoaded = !hydrated.current && hasImageLoaded(cacheKey)
+
+  imgStyle = {
+    objectFit,
+    objectPosition,
+    backgroundColor,
+    ...imgStyle,
+  }
 
   const component = (
     <LayoutWrapper layout={layout} width={width} height={height}>
-      {!hasLoaded && placeholder && (
-        <Placeholder {...getPlaceHolderProps(placeholder)} />
-      )}
+      <Placeholder
+        {...getPlaceholderProps(
+          placeholder,
+          isLoaded,
+          layout,
+          width,
+          height,
+          wrapperBackgroundColor,
+          objectFit,
+          objectPosition
+        )}
+      />
+
       <MainImage
         {...(props as Omit<MainImageProps, "images" | "fallback">)}
+        width={width}
+        height={height}
+        className={imgClassName}
         {...getMainProps(
           isLoading,
-          hasLoaded || isLoaded,
+          isLoaded,
           images,
           loading,
           toggleIsLoaded,
           cacheKey,
-          ref
+          ref,
+          imgStyle
         )}
       />
     </LayoutWrapper>
   )
 
-  const doRender = hydrated.current ? render : hydrate
-  doRender(component, root.current)
-  hydrated.current = true
+  if (root.current) {
+    // Force render to mitigate "Expected server HTML to contain a matching" in develop
+    const doRender = hydrated.current || forceHydrate.current ? render : hydrate
+    doRender(component, root.current)
+    hydrated.current = true
+  }
 
   return (): void => {
     if (root.current) {

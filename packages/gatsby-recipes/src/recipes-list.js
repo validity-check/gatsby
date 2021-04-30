@@ -38,6 +38,10 @@ export default [
     value: `theme-ui`,
   },
   {
+    label: `Add Chakra UI`,
+    value: `chakra-ui`,
+  },
+  {
     label: `Add Emotion`,
     value: `emotion`,
   },
@@ -62,7 +66,7 @@ export default [
     value: `sass`,
   },
   {
-    label: `Add Typescript`,
+    label: `Add TypeScript`,
     value: `typescript`,
   },
   {
@@ -86,8 +90,8 @@ export default [
     value: `travis-deploy-github-pages`,
   },
   {
-    label: `Add Headless WordPress integration`,
-    value: `wordpress`,
+    label: `Add e-commerce powered by Snipcart`,
+    value: `snipcart.mdx`,
   },
   {
     label: `Add Storybook - JavaScript`,

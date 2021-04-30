@@ -12,6 +12,8 @@ const fetch = require(`../fetch`)
 const normalize = require(`../normalize`)
 
 const startersBlogFixture = require(`../__fixtures__/starter-blog-data`)
+const richTextFixture = require(`../__fixtures__/rich-text-data`)
+const restrictedContentTypeFixture = require(`../__fixtures__/restricted-content-type`)
 
 const pluginOptions = { spaceId: `testSpaceId` }
 
@@ -38,8 +40,8 @@ describe(`gatsby-node`, () => {
   }
   const createNodeId = jest.fn(value => value)
   let currentNodeMap
-  let getNodes = () => Array.from(currentNodeMap.values())
-  let getNode = id => currentNodeMap.get(id)
+  const getNodes = () => Array.from(currentNodeMap.values())
+  const getNode = id => currentNodeMap.get(id)
 
   const getFieldValue = (value, locale, defaultLocale) =>
     value[locale] ?? value[defaultLocale]
@@ -255,7 +257,7 @@ describe(`gatsby-node`, () => {
       // don't allow mutations (this isn't traversing so only top level is frozen)
       currentNodeMap.set(node.id, Object.freeze(node))
     })
-    actions.deleteNode = ({ node }) => {
+    actions.deleteNode = node => {
       currentNodeMap.delete(node.id)
     }
     actions.touchNode = jest.fn()
@@ -544,7 +546,7 @@ describe(`gatsby-node`, () => {
       pluginOptions
     )
 
-    let authorIds = []
+    const authorIds = []
     // check if blog post exists
     removedBlogEntryIds.forEach(entryId => {
       const blogEntry = getNode(entryId)
@@ -667,6 +669,112 @@ describe(`gatsby-node`, () => {
     testIfAssetsDeleted(
       startersBlogFixture.removeAsset().currentSyncData.deletedAssets,
       locales
+    )
+  })
+
+  it(`stores rich text as raw with references attached`, async () => {
+    fetch.mockImplementationOnce(richTextFixture.initialSync)
+
+    // initial sync
+    await gatsbyNode.sourceNodes(
+      {
+        actions,
+        store,
+        getNodes,
+        getNode,
+        reporter,
+        createNodeId,
+        cache,
+        getCache,
+        schema,
+      },
+      pluginOptions
+    )
+
+    const initNodes = getNodes()
+
+    const homeNodes = initNodes.filter(
+      ({ contentful_id: id }) => id === `6KpLS2NZyB3KAvDzWf4Ukh`
+    )
+    homeNodes.forEach(homeNode => {
+      expect(homeNode.content.references___NODE).toStrictEqual([
+        ...new Set(homeNode.content.references___NODE),
+      ])
+      expect(homeNode.content.references___NODE).toMatchSnapshot()
+    })
+  })
+
+  it(`panics when localeFilter reduces locale list to 0`, async () => {
+    cache.get.mockClear()
+    cache.set.mockClear()
+    fetch.mockImplementationOnce(startersBlogFixture.initialSync)
+    const locales = [`en-US`, `nl`]
+
+    const mockPanicReporter = {
+      ...reporter,
+      panic: jest.fn(),
+    }
+
+    await gatsbyNode.sourceNodes(
+      {
+        actions,
+        store,
+        getNodes,
+        getNode,
+        reporter: mockPanicReporter,
+        createNodeId,
+        cache,
+        getCache,
+        schema,
+      },
+      {
+        ...pluginOptions,
+        localeFilter: () => false,
+      }
+    )
+
+    expect(mockPanicReporter.panic).toBeCalledWith(
+      expect.objectContaining({
+        context: {
+          sourceMessage: `Please check if your localeFilter is configured properly. Locales '${locales.join(
+            `,`
+          )}' were found but were filtered down to none.`,
+        },
+      })
+    )
+  })
+
+  it(`panics when response contains restricted content types`, async () => {
+    cache.get.mockClear()
+    cache.set.mockClear()
+    fetch.mockImplementationOnce(restrictedContentTypeFixture.initialSync)
+
+    const mockPanicReporter = {
+      ...reporter,
+      panic: jest.fn(),
+    }
+
+    await gatsbyNode.sourceNodes(
+      {
+        actions,
+        store,
+        getNodes,
+        getNode,
+        reporter: mockPanicReporter,
+        createNodeId,
+        cache,
+        getCache,
+        schema,
+      },
+      pluginOptions
+    )
+
+    expect(mockPanicReporter.panic).toBeCalledWith(
+      expect.objectContaining({
+        context: {
+          sourceMessage: `Restricted ContentType name found. The name "reference" is not allowed.`,
+        },
+      })
     )
   })
 })

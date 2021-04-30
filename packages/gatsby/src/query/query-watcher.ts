@@ -1,4 +1,4 @@
-/** *
+/***
  * Jobs of this module
  * - Maintain the list of components in the Redux store. So monitor new components
  *   and add/remove components.
@@ -15,11 +15,10 @@ import path from "path"
 import { slash } from "gatsby-core-utils"
 
 import { store, emitter } from "../redux/"
-import { boundActionCreators } from "../redux/actions"
+import { actions } from "../redux/actions"
 import { IGatsbyStaticQueryComponents } from "../redux/types"
 import queryCompiler from "./query-compiler"
 import report from "gatsby-cli/lib/reporter"
-import queryUtil from "./"
 import { getGatsbyDependents } from "../utils/gatsby-dependents"
 
 const debug = require(`debug`)(`gatsby:query-watcher`)
@@ -73,7 +72,6 @@ const handleComponentsWithRemovedQueries = (
         type: `REMOVE_STATIC_QUERY`,
         payload: c.id,
       })
-      boundActionCreators.deleteComponentsDependencies([c.id])
     }
   })
 }
@@ -99,22 +97,21 @@ const handleQuery = (
       oldQuery?.hash !== query.hash ||
       oldQuery?.query !== query.text
     ) {
-      boundActionCreators.replaceStaticQuery({
-        name: query.name,
-        componentPath: query.path,
-        id: query.id,
-        query: query.text,
-        hash: query.hash,
-      })
+      store.dispatch(
+        actions.replaceStaticQuery({
+          name: query.name,
+          componentPath: query.path,
+          id: query.id,
+          query: query.text,
+          hash: query.hash,
+        })
+      )
 
       debug(
         `Static query in ${component} ${
           isNewQuery ? `was added` : `has changed`
         }.`
       )
-
-      boundActionCreators.deleteComponentsDependencies([query.id])
-      queryUtil.enqueueExtractedQueryId(query.id)
     }
     return true
   }
@@ -238,10 +235,12 @@ export const updateStateAndRunQueries = async (
     const { isStaticQuery = false, text = `` } =
       queries.get(c.componentPath) || {}
 
-    boundActionCreators.queryExtracted({
-      componentPath: c.componentPath,
-      query: isStaticQuery ? `` : text,
-    })
+    store.dispatch(
+      actions.queryExtracted({
+        componentPath: c.componentPath,
+        query: isStaticQuery ? `` : text,
+      })
+    )
   })
 
   let queriesWillNotRun = false
@@ -278,8 +277,6 @@ export const updateStateAndRunQueries = async (
 
       `)
   }
-
-  queryUtil.runQueuedQueries()
 }
 
 export const extractQueries = ({
